@@ -196,9 +196,10 @@ class MsSolver : public PbSolver {
         num_cmp(const std::vector<int>& num) : number(num) { }
     };
 
-    static int get_score(int x, const std::vector<int>& number, const vec<bool>& model) {
-        if(model[x]) return number[x << 1] - number[(x << 1) & 1];
-        else         return number[(x << 1) & 1] - number[x << 1];
+    static int get_score(const int& x, const std::vector<int>& number, const vec<bool>& model) {
+        assert(x >= 0);
+        if(model[x]) return number[x << 1] - number[(x << 1) ^ 1];
+        else         return number[(x << 1) ^ 1] - number[x << 1];
     }
 
     struct score_cmp {
@@ -214,8 +215,8 @@ class MsSolver : public PbSolver {
     std::vector<std::vector<int>> lit_hard;
     std::vector<std::vector<int>> lit_soft;
     std::vector<int> score;
-    std::vector<Lit> hard_sat_var;
-    std::vector<Lit> soft_sat_var;
+    std::vector<int> hard_sat_var;
+    std::vector<int> soft_sat_var;
     std::vector<int> hard_truth_num;
     std::vector<int> soft_truth_num;
     vec<bool> tmp_model;
@@ -245,6 +246,7 @@ class MsSolver : public PbSolver {
 #endif    
 
     void    local_search(vec<bool>& best_model, Int& goalvalue);
+    int     select_by_BMS(int min_size);
     void    pick_var(std::vector<int>& vars);
     void    flip(std::vector<int>& vars, int& unsat_clause_num);
     void    update_weight();

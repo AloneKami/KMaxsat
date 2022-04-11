@@ -390,7 +390,7 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
         else if (weight >= hard_bound) {
             if (!solver.addClause(ps)) return false;
             else {
-                solver.hard_sat_var.push_back(lit_Undef);
+                solver.hard_sat_var.push_back(toInt(lit_Undef));
             }
         } else {
             if (ps.size() == 1) {

@@ -11,7 +11,7 @@
 
 const int sp = 10;
 const int min_step = 500;
-const int max_step = 10000;
+const int max_step = 2000;
 
 void MsSolver::update_weight() {
     if(rand() % 1000 < sp) {
@@ -27,7 +27,9 @@ void MsSolver::flip(std::vector<int>& vars, int& unsat_clause_num) {
     for(auto u : vars) {
         tmp_model[u] = !tmp_model[u];
         Lit tmp_lit = mkLit(u, !tmp_model[u]);
-        for(auto cls : lit_hard[u].size()) {
+        printf("%d ---- %d\n", u, lit_hard[u].size());
+        for(auto cls : lit_hard[u]) {
+            printf("%d %d\n", cls, hard_truth_num[cls]);
             hard_truth_num[cls]--;
             if(hard_truth_num[cls] == 0) {
                 for(int i = 0; i < ls_hard_cls[cls].snd->size(); i++) {
@@ -36,23 +38,18 @@ void MsSolver::flip(std::vector<int>& vars, int& unsat_clause_num) {
                     score[toInt(lit)] += ls_hard_cls[cls].fst;
                     var_score.update(var(lit));
                 }
-                hard_sat_var[cls] = lit_Undef;
+                hard_sat_var[cls] = toInt(lit_Undef);
             }
             else if(hard_truth_num[cls] == 1) {
-                for(int i = 0; i < ls_hard_cls[cls].snd->size(); i++) {
-                    Lit lit = (*ls_hard_cls[cls].snd)[i];
-                    if((tmp_model[toInt(lit)] && !sign(lit)) || (!tmp_model[toInt(lit)] && sign(lit))) {
-                        score[toInt(lit)] += ls_hard_cls[cls].fst;
-                        var_score.update(toInt(lit));
-                        hard_sat_var[cls] = lit;
-                        break;
-                    }
-                }
-                score[toInt(tmp_lit)] -= ls_hard_cls[cls].fst;
-                var_score.update(u);
+                printf("%d %d\n", hard_sat_var[cls], toInt(tmp_lit));
+                hard_sat_var[cls] -= toInt(tmp_lit);
+                printf("%d\n", hard_sat_var[cls]);
+                score[hard_sat_var[cls]] += ls_hard_cls[cls].fst;
+                var_score.update(var(Minisat::toLit(hard_sat_var[cls])));
             }
         }
-        for(auto cls : lit_soft[u].size()) {
+        printf("111\n");
+        for(auto cls : lit_soft[u]) {
             soft_truth_num[cls]--;
             if(soft_truth_num[cls] == 0) {
                 for(int i = 0; i < ls_soft_cls[cls].snd->size(); i++) {
@@ -61,24 +58,17 @@ void MsSolver::flip(std::vector<int>& vars, int& unsat_clause_num) {
                     score[toInt(lit)] += ls_soft_cls[cls].fst;
                     var_score.update(var(lit));
                 }
-                soft_sat_var[cls] = lit_Undef;
+                soft_sat_var[cls] = toInt(lit_Undef);
             }
             else if(soft_truth_num[cls] == 1) {
-                for(int i = 0; i < ls_soft_cls[cls].snd->size(); i++) {
-                    Lit lit = (*ls_soft_cls[cls].snd)[i];
-                    if((tmp_model[toInt(lit)] && !sign(lit)) || (!tmp_model[toInt(lit)] && sign(lit))) {
-                        score[toInt(lit)] += ls_soft_cls[cls].fst;
-                        var_score.update(toInt(lit));
-                        soft_sat_var[cls] = lit;
-                        break;
-                    }
-                }
-                score[toInt(tmp_lit)] -= ls_soft_cls[cls].fst;
-                var_score.update(u);
+                soft_sat_var[cls] -= toInt(tmp_lit);
+                score[soft_sat_var[cls]] += ls_soft_cls[cls].fst;
+                var_score.update(var(Minisat::toLit(soft_sat_var[cls])));
             }
         }
+        printf("222\n");
         tmp_lit = mkLit(u, tmp_model[u]);
-        for(auto cls : lit_hard[u].size()) {
+        for(auto cls : lit_hard[u]) {
             hard_truth_num[cls]++;
             if(hard_truth_num[cls] == 1) {
                 for(int i = 0; i < ls_hard_cls[cls].snd->size(); i++) {
@@ -87,40 +77,38 @@ void MsSolver::flip(std::vector<int>& vars, int& unsat_clause_num) {
                     score[toInt(lit)] -= ls_hard_cls[cls].fst;
                     var_score.update(var(lit));
                 }
-                hard_sat_var[cls] = tmp_lit;
+                hard_sat_var[cls] = toInt(tmp_lit);
             }
             else if(hard_truth_num[cls] == 2) {
-                for(int i = 0; i < ls_hard_cls[cls].snd->size(); i++) {
-                    Lit lit = (*ls_hard_cls[cls].snd)[i];
-                    if((tmp_model[toInt(lit)] && !sign(lit)) || (!tmp_model[toInt(lit)] && sign(lit))) {
-                        score[toInt(lit)] -= ls_hard_cls[cls].fst;
-                        
-                    }
-                }
-                score[tmp_lit] += ls_hard_cls[cls].fst;
-                hard_sat_var[cls] = mkLit(u, tmp_model[u]);
+                score[hard_sat_var[cls]] -= ls_hard_cls[cls].fst;
+                var_score.update(Minisat::var(Minisat::toLit(hard_sat_var[cls])));
+                hard_sat_var[cls] += toInt(tmp_lit);
             }
         }
-        for(auto cls : lit_soft[u].size()) {
+        printf("333\n");
+        for(auto cls : lit_soft[u]) {
             soft_truth_num[cls]++;
             if(soft_truth_num[cls] == 1) {
                 for(int i = 0; i < ls_soft_cls[cls].snd->size(); i++) {
                     Lit lit = (*ls_soft_cls[cls].snd)[i];
+                    if(lit == tmp_lit) continue;
                     score[toInt(lit)] -= ls_soft_cls[cls].fst;
+                    var_score.update(var(lit));
                 }
-                score[toInt(hard_sat_var[cls])] += ls_hard_cls[cls].fst;
-                hard_sat_var[cls] = mkLit(u, tmp_model[u]);
+                soft_sat_var[cls] = toInt(tmp_lit);
             }
-            else if(hard_truth_num[cls] == 2) {
-                score[tmp_lit] += ls_hard_cls[cls].fst;
-                hard_sat_var[cls] = mkLit(u, tmp_model[u]);
+            else if(soft_truth_num[cls] == 2) {
+                score[soft_sat_var[cls]] -= ls_soft_cls[cls].fst;
+                var_score.update(Minisat::var(Minisat::toLit(soft_sat_var[cls])));
+                soft_sat_var[cls] += toInt(tmp_lit);
             }
         }
+        printf("444\n");
     }
     return;
 }
 
-int select_by_BMS(int min_size) {
+int MsSolver::select_by_BMS(int min_size) {
     int max_score = 0;
     int v = -1;
     int tmp_v, tmp_score;
@@ -141,11 +129,14 @@ int select_by_BMS(int min_size) {
 }
 
 void MsSolver::pick_var(std::vector<int>& vars) {
+    printf("pick_var start\n");
     vars.clear();
     std::vector<int> FV;
     FV.clear();
     if(var_score.get_strat() > 0) {
+        printf("1 %d\n", var_score.get_strat());
         vars.push_back(select_by_BMS(__BMS__));
+        for(int i = 0; i < vars.size(); i++) printf("%d %d %d %d\n", vars[i], get_score(vars[i], score, tmp_model), score[toInt(mkLit(vars[i], !tmp_model[vars[i]]))], score[toInt(mkLit(vars[i], tmp_model[vars[i]]))]);
     }
     else {
         int tmp_strat, min_size, tmp_score, tmp_v;
@@ -153,6 +144,7 @@ void MsSolver::pick_var(std::vector<int>& vars) {
         int max_score = INT_MIN;
         int score_2, score_3;
         if(hard_unsat.get_strat() > 0) {
+            printf("2\n");
             min_size = min(__SC_NUM__, hard_unsat.get_strat());
             tmp_strat = hard_unsat.get_strat();
             for(int i = 0; i < min_size; i++) {
@@ -168,6 +160,7 @@ void MsSolver::pick_var(std::vector<int>& vars) {
             }
         }
         else if(soft_unsat.get_strat() > 0) {
+            printf("3\n");
             min_size = min(__SC_NUM__, soft_unsat.get_strat());
             tmp_strat = soft_unsat.get_strat();
             for(int i = 0; i < min_size; i++) {
@@ -188,11 +181,11 @@ void MsSolver::pick_var(std::vector<int>& vars) {
         int unsat_clause_num;
         int v1, v2;
         for(auto u : FV) {
-            score_3 = score(u);
+            score_3 = get_score(var(Minisat::toLit(u)), score, tmp_model);
             tmp_vec.clear();
             tmp_vec.push_back(u); 
             flip(tmp_vec, unsat_clause_num);
-            v1 = tmp_vec;
+            v1 = u;
             if(var_score.get_strat() > 0) {
                 tmp_v = select_by_BMS(__SV_NUM__);
                 tmp_score = get_score(v2, score, tmp_model);
@@ -209,10 +202,11 @@ void MsSolver::pick_var(std::vector<int>& vars) {
             }
             flip(tmp_vec, unsat_clause_num);
         }
-        update_weight();
+        //update_weight();
         if(max_score > score_2) vars.push_back(max_v);
         else vars.push_back(v1), vars.push_back(v2);
     }
+    printf("pick_var finish\n");
     return;    
 }
 
@@ -227,48 +221,55 @@ void MsSolver::local_search(vec<bool>& model, Int& goalvalue) {
     var_score.clear();
     hard_unsat.clear();
     soft_unsat.clear();
-    for(int i = 0; i < pb_n_constrs; i++) hard_truth_num[i] = 0, hard_sat_var[i] = lit_Undef;
-    for(int i = 0; i < soft_cls.size(); i++) soft_truth_num[i] = 0, soft_sat_var[i] = lit_Undef;
+    for(int i = 0; i < pb_n_constrs; i++) hard_truth_num[i] = 0, hard_sat_var[i] = toInt(lit_Undef);
+    for(int i = 0; i < soft_cls.size(); i++) soft_truth_num[i] = 0, soft_sat_var[i] = toInt(lit_Undef);
     memset(score.data(), 0, score.size() * sizeof(int));
     bool is_satisfied;
     for(int i = 0; i < pb_n_constrs; i++) {
         for(int j = 0; j < ls_hard_cls[i].snd->size(); j++) {
             Lit tmp_l = (*ls_hard_cls[i].snd)[j];
             if((sign(tmp_l) && !tmp_model[var(tmp_l)]) || (!sign(tmp_l) && tmp_model[var(tmp_l)])) {
+                if(i == 49) printf("%d ", toInt(tmp_l));
+                if(hard_truth_num[i] == 0) hard_sat_var[i] = 0; 
+                hard_sat_var[i] += toInt(tmp_l);
                 hard_truth_num[i]++;
-                hard_sat_var[i] = tmp_l;
             }
         }
     }
+    printf("\n");
     for(int i = 0; i < pb_n_constrs; i++) {
-        assert(hard_sat_var[i] < score.size());
         //printf("%d %d %d\n", hard_sat_var[i], hard_clause_weight[i], score.size());
-        if(hard_truth_num[i] == 1) score[toInt(hard_sat_var[i])] += ls_hard_cls[i].fst;
+        if(hard_truth_num[i] == 1) score[hard_sat_var[i]] += ls_hard_cls[i].fst;
         hard_unsat.insert(i);
     }
     for(int i = 0; i < soft_cls.size(); i++) {
         Lit& tmp_l = *(soft_cls[i].snd)[0];
         if((sign(tmp_l) && !tmp_model[var(tmp_l)]) || (!sign(tmp_l) && tmp_model[var(tmp_l)])) {
+            if(soft_truth_num[i] == 0) soft_sat_var[i] = 0;
+            soft_sat_var[i] += toInt(tmp_l);
             soft_truth_num[i]++;
-            soft_sat_var[i] = tmp_l;
         }
         for(int j = 1; j < soft_cls[i].snd->size() - 1; j++) {
             Lit& tmp_l = *(soft_cls[i].snd)[j];
             if((sign(tmp_l) && !tmp_model[var(tmp_l)]) || (!sign(tmp_l) && tmp_model[var(tmp_l)])) {
+                if(soft_truth_num[i] == 0) soft_sat_var[i] = 0;
+                soft_sat_var[i] += toInt(tmp_l);
                 soft_truth_num[i]++;
-                soft_sat_var[i] = tmp_l;
             }
         }
     }
     for(int i = 0; i < soft_cls.size(); i++) {
         soft_unsat.insert(i);
-        if(soft_truth_num[i] == 1) score[toInt(soft_sat_var[i])] += ls_soft_cls[i].fst;
+        if(soft_truth_num[i] == 1) score[soft_sat_var[i]] += ls_soft_cls[i].fst;
     }
     for(int i = 0; i < nVars(); i++) var_score.insert(i);
     while(no_improve_step < min_step && step < max_step) {
+        printf("%d %d\n", no_improve_step, step);
         if(unsat_clause_num == 0) {
             Int currentvalue = evalGoal(soft_cls, tmp_model, soft_unsat_clause) + fixed_goalval;
+            printf("currentvalue = %d\n", toint(currentvalue));
             if(currentvalue < goalvalue) {
+                goalvalue = currentvalue;
                 no_improve_step = 0;                   
                 tmp_model.copyTo(model);
             }

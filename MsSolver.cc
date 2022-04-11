@@ -480,7 +480,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     Sort::sort(soft_cls);
     soft_cls.copyTo(ls_soft_cls);
     for(int i = 0; i < soft_cls.size(); i++) {
-        soft_sat_var.push_back(lit_Undef);
+        soft_sat_var.push_back(toInt(lit_Undef));
         soft_truth_num.push_back(0);
         Lit& tmp_l = *(soft_cls[i].snd)[0];
         lit_soft[toInt(tmp_l)].push_back(i);
