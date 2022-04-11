@@ -100,6 +100,7 @@ bool PbSolver::convertPbs(bool first_call)
         } else {
             vec<Lit> out;
             clausify(sat_solver, converted_constrs, out);
+            //printf("After clausify %d\n", constrs.size());
             for (int i = 0, j = 0; i < constrs.size(); i++) 
                 if (constrs[i] != NULL) constrs[i]->lit = out[j++];
         }

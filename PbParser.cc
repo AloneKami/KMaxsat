@@ -337,6 +337,7 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
     int    gvars = 0;
     Int one(1), weight(0);
     int n_vars = 0, n_constrs = 0;
+    bool is_satisfied;
 
 #ifdef MAXPRE
     extern bool opt_use_maxpre;
@@ -388,6 +389,9 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
         if (weight <= 0) { ps.clear(); continue; }
         else if (weight >= hard_bound) {
             if (!solver.addClause(ps)) return false;
+            else {
+                solver.hard_sat_var.push_back(lit_Undef);
+            }
         } else {
             if (ps.size() == 1) {
                 if (!opt_maxsat_msu) gps.push(~ps.last()), gCs.push(weight);
@@ -412,13 +416,14 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
         if (solver.declared_n_constrs < 0 && n_constrs > 0) solver.declared_n_constrs = n_constrs;
         gvars = solver.soft_cls.size();
         tmp.clear(); tmp.growTo(16,0);
-        for (int i = 0; i < gvars; i++)
+        for (int i = 0; i < gvars; i++) {
             if (solver.soft_cls[i].snd->last() == lit_Undef) {
                 sprintf(&tmp[0],"#%d",i + 1);
                 Lit p = mkLit(solver.getVar(tmp), true);
                 solver.soft_cls[i].snd->last() = p;
                 if (!opt_maxsat_msu) gps[i] = p;
             }
+        }
     }
 #ifdef MAXPRE
     if (opt_use_maxpre) {

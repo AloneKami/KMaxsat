@@ -102,7 +102,7 @@ void Clausifier::_collect(Formula f, vec<Formula>& out)
 Lit Clausifier::polarityClausify(Formula f)
 {
     Lit result = lit_Undef;
-
+    //printf("polarityClausify: %d %d %d %d %d\n", index(f), sign(f), compo(f), Atom_p(f), Const_p(f));
     if (Atom_p(f)){
       #if 0
         assert(!Const_p(f));
@@ -115,6 +115,7 @@ Lit Clausifier::polarityClausify(Formula f)
       #endif
         result = mkLit(index(f),sign(f));
     }else if (vmapp.at(f) != lit_Undef && !s.isEliminated(var(vmapp.at(f)))){
+        //printf("--\n");
         result = vmapp.at(f);
     }else{
 #ifdef MINISAT
@@ -331,6 +332,7 @@ Lit Clausifier::basicClausify(Formula f)
 
 void clausify(SimpSolver& s, const vec<Formula>& fs, vec<Lit>& out)
 {
+    //printf("Before Clausifier\n");
     Clausifier c(s);
 
     for (int i = 0; i < fs.size(); i++)

@@ -47,6 +47,7 @@ int PbSolver::getVar(cchar* name)
         sat_solver.newVar();        // (reserve one SAT variable for each PB variable)
         ret = name2index.set(index2name.last(), x);
     }
+    //printf("getVar: %s %d\n", name, ret);
     return ret;
 }
 
@@ -67,6 +68,9 @@ void PbSolver::addGoal(const vec<Lit>& ps, const vec<Int>& Cs)
 }
 
 bool PbSolver::addConstr(const vec<Lit>& ps, const vec<Int>& Cs, Int rhs, int ineq, Lit& lit) {
+    //printf("AddConstr: %d ", ps.size());
+    //for(int i = 0; i < ps.size(); i++) if(toint(Cs[i]) == 1) printf("%d ", ps[i].x); else exit(0);
+    //printf("%s %d\n", toString(rhs), ineq);
   vec<Lit>    norm_ps;
   vec<Int>    norm_Cs;
   Int         norm_rhs;
@@ -123,6 +127,9 @@ static Int gcd(Int small, Int big) {
 
 bool PbSolver::normalizePb(vec<Lit>& ps, vec<Int>& Cs, Int& C, Lit& lit)
 {
+    //printf("normalizePb: ");
+    //for(int i = 0; i < ps.size(); i++) printf("%d*%d ", toint(Cs[i]), ps[i].x);
+    //printf("%d\n", toint(C));
     assert(ps.size() == Cs.size());
     if (!okay()) return false;
 
@@ -181,7 +188,7 @@ bool PbSolver::normalizePb(vec<Lit>& ps, vec<Int>& Cs, Int& C, Lit& lit)
     }
     ps.shrink(ps.size() - Csps.size());
     Cs.shrink(Cs.size() - Csps.size());
-
+    //printf("%d %d\n", toint(C), toint(sum));
     if (opt_maxsat_msu && opt_minimization == 1 && lit == lit_Undef && C >= sum && C != 0) {
         lit = mkLit(sat_solver.newVar(VAR_UPOL, !opt_branch_pbvars));
         sat_solver.setFrozen(var(lit), true);
@@ -249,6 +256,7 @@ bool PbSolver::normalizePb(vec<Lit>& ps, vec<Int>& Cs, Int& C, Lit& lit)
 
 void PbSolver::storePb(const vec<Lit>& ps, const vec<Int>& Cs, Int lo, Int hi, Lit lit)
 {
+    //printf("storePb: %d %s %d\n", toint(lo), toString(hi), toInt(lit));
     assert(ps.size() == Cs.size());
     for (int i = 0; i < ps.size(); i++)
         if (toInt(ps[i]) < n_occurs.size()) n_occurs[toInt(ps[i])]++;

@@ -325,6 +325,30 @@ void MsSolver::optimize_last_constraint(vec<Linear*>& constrs, Minisat::vec<Lit>
 
 static inline int log2(int n) { int i=0; while (n>>=1) i++; return i; }
 
+void print_Lits(const char *s, const Minisat::vec<Lit> &ps, bool print_data = false)
+{
+    Minisat::vec<Lit> ps1;
+    ps.copyTo(ps1);
+    std::sort(&ps1[0], &ps1[ps1.size()]);
+    reportf("%s: (size=%d) {", s, ps1.size());
+    if (print_data)
+        for (int i = 0; i < ps1.size(); ++i)
+            reportf("%c%d,", sign(ps1[i]) ? '-' : ' ', var(ps1[i]) + 1);
+    reportf("},\n");
+}
+
+// https://stackoverflow.com/questions/20511347/a-good-hash-function-for-a-vector
+uint32 get_hash(const Minisat::vec<Lit> &ps)
+{
+    Minisat::vec<Lit> qs;
+    ps.copyTo(qs);
+    std::sort(&qs[0], &qs[qs.size()]);
+    uint32 hash = qs.size();
+    for (int i = 0; i < qs.size(); ++i)
+        hash ^= uint32(qs[i].x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    return hash;
+}
+
 void MsSolver::maxsat_solve(solve_Command cmd)
 {
     if (!okay()) {
@@ -339,6 +363,22 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     // Convert constraints:
     pb_n_vars = nVars();
     pb_n_constrs = nClauses();
+    for(int i = 0; i < pb_n_vars * 2; i++) {
+        lit_hard.push_back(std::vector<int>());
+        lit_soft.push_back(std::vector<int>());
+        score.push_back(0);
+    }
+    bool is_satisfied;
+    for(int i = 0; i < pb_n_constrs; i++) {
+        hard_truth_num.push_back(0);
+        const Minisat::Clause &ps = sat_solver.GetClause(i, is_satisfied);
+        Minisat::vec<Lit> *ps_copy = new Minisat::vec<Lit>;
+        for(int j = 0; j < ps.size(); j++) {
+            lit_hard[toInt(ps[j])].push_back(i);
+            ps_copy->push(ps[j]);
+        }
+        ls_hard_cls.push(Pair_new(1, ps_copy));
+    }
     if (constrs.size() > 0) {
         if (opt_verbosity >= 1)
             reportf("Converting %d PB-constraints to clauses...\n", constrs.size());
@@ -438,6 +478,17 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     if (j < soft_cls.size()) soft_cls.shrink(soft_cls.size() - j);
     top_for_strat = top_for_hard = soft_cls.size();
     Sort::sort(soft_cls);
+    soft_cls.copyTo(ls_soft_cls);
+    for(int i = 0; i < soft_cls.size(); i++) {
+        soft_sat_var.push_back(lit_Undef);
+        soft_truth_num.push_back(0);
+        Lit& tmp_l = *(soft_cls[i].snd)[0];
+        lit_soft[toInt(tmp_l)].push_back(i);
+        for(int j = 1; j < soft_cls[i].snd->size() - 1; j++) {
+            Lit& tmp_l = *(soft_cls[i].snd)[j];
+            lit_soft[toInt(tmp_l)].push_back(i);
+        }
+    }
     weighted_instance = (soft_cls.size() > 1 && soft_cls[0].fst != soft_cls.last().fst);
     for (int i = 0; i < soft_cls.size(); i++) {
         Lit p = soft_cls[i].snd->last();
@@ -520,17 +571,34 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     if (opt_use_scip_slvr)
         scip_solve(&assump_ps, &assump_Cs, &delayed_assump, weighted_instance, sat_orig_vars, sat_orig_cls);
 #endif
+
+    const bool enable_multi_solve = !weighted_instance;
+    const int multi_solve_num_limit = 50;
+    const double multi_solve_time_limit_max = 20; // seconds
+    const double multi_solve_time_limit_min = 3; // seconds
+    const bool enable_dynamic_delay = !weighted_instance;
+    const int dynamic_delay_core_threshoad = 5;
+    const bool enable_delay_pop_one = !weighted_instance;
+    delayed_assump.weighted_instance = weighted_instance;
+    opt_to_bin_search = weighted_instance;
+
     lbool status;
+    int cn = 0;
+    auto uwr_begin = cpuTime();
     while (1) {
+      cn++;
       if (use_base_assump) for (int i = 0; i < base_assump.size(); i++) assump_ps.push(base_assump[i]);
       if (opt_minimization == 1 && opt_to_bin_search && opt_unsat_conflicts >= 100000 &&
                                  sat_solver.conflicts < opt_unsat_conflicts - 500)
           sat_solver.setConfBudget(opt_unsat_conflicts - sat_solver.conflicts);
       else sat_solver.budgetOff();
+      auto begin = cpuTime();
       status = 
           base_assump.size() == 1 && base_assump[0] == assump_lit ? l_True :
           base_assump.size() == 1 && base_assump[0] == ~assump_lit ? l_False :
           sat_solver.solveLimited(assump_ps);
+      auto end = cpuTime();
+      auto _1st_solve_time = end - begin;
       if (use_base_assump) {
           for (int i = 0; i < base_assump.size(); i++) {
               if (status == l_True && var(base_assump[i]) < pb_n_vars) addUnit(base_assump[i]);
@@ -584,6 +652,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                 if (soft_cls[i].snd->size() > 1)
                     model[var(soft_cls[i].snd->last())] = !sign(soft_cls[i].snd->last());
             Int goalvalue = evalGoal(soft_cls, model, soft_unsat) + fixed_goalval;
+            local_search(model, goalvalue);
             extern bool opt_satisfiable_out;
             if (
 #ifdef USE_SCIP
@@ -661,6 +730,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                         new_assump.push(Pair_new(delayed_assump.top().snd, max_assump_Cs));
                         delayed_assump_sum -= delayed_assump.top().fst;
                         delayed_assump.pop(); 
+                        if(enable_delay_pop_one) break;
                     } while (!delayed_assump.empty() && delayed_assump.top().fst >= max_assump_Cs);
                     Sort::sort(new_assump); int sz = new_assump.size();
                     assump_ps.growTo(assump_ps.size() + sz); assump_Cs.growTo(assump_Cs.size() + sz);
@@ -704,6 +774,46 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         if (assump_ps.size() == 0 && assump_lit == lit_Undef || 
             opt_minimization == 0 && sat_solver.conflict.size() == 1 && sat_solver.conflict[0] == ~assump_lit) break;
         {
+
+        if(enable_multi_solve && _1st_solve_time < 20 && sat_solver.conflict.size() >= 4)
+        {
+            Minisat::vec<Lit> assump_tmp, bestConfict;
+            assump_ps.copyTo(assump_tmp);
+            sat_solver.conflict.copyTo(bestConfict);
+
+            if(opt_verbosity) reportf("Second solve...\n");
+            int solve_cn = 0;
+            auto _2nd_solve_begin = cpuTime();
+            srand(0);
+            auto time_limit = std::max(std::min(_1st_solve_time, multi_solve_time_limit_max), multi_solve_time_limit_min);
+            std::vector<uint32> core_hashs = {get_hash(sat_solver.conflict)};
+            while(solve_cn < multi_solve_num_limit || (cpuTime() - _2nd_solve_begin) < _1st_solve_time)
+            {
+                if((cpuTime() - _2nd_solve_begin) > time_limit)   break;
+                if(solve_cn > 10000) break;
+                solve_cn++;
+                if(solve_cn == 1)
+                    sat_solver.increased_assump_bcp = true;
+                else
+                    std::random_shuffle(&assump_tmp[0], &assump_tmp[assump_tmp.size()]);
+                lbool res = sat_solver.solveLimited(assump_tmp);
+                if(solve_cn == 1) sat_solver.increased_assump_bcp = false;
+                assert(res == l_False);
+                if(bestConfict.size() > sat_solver.conflict.size() )
+                    sat_solver.conflict.copyTo(bestConfict);
+                if(bestConfict.size() == 1) break;
+
+                uint32 hash = get_hash(sat_solver.conflict);
+                core_hashs.push_back(hash);
+                int size = core_hashs.size();
+                if (size >= 3 && hash == core_hashs[size - 2] && hash == core_hashs[size - 3])
+                    break;
+            }
+            if(opt_verbosity) reportf("%d solves done in %.1fs\n", multi_solve_num_limit, cpuTime() - _2nd_solve_begin);
+            if(opt_verbosity) reportf("bestUnminimizedConflict.size = %d\n", bestConfict.size());
+            bestConfict.copyTo(sat_solver.conflict);
+        }
+
         Minisat::vec<Lit> core_mus;
         if (opt_core_minimization) {
             if (weighted_instance) {
@@ -814,7 +924,8 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                 modified_saved_constrs.clear();
             }
         }
-        if (assump_lit != lit_Undef && !use_base_assump) {
+        bool use_delay = enable_dynamic_delay && constrs.size() && constrs.last()->size >= dynamic_delay_core_threshoad;
+        if (!use_delay && assump_lit != lit_Undef && !use_base_assump) {
             sat_solver.setFrozen(var(assump_lit),true);
             assump_ps.push(assump_lit); assump_Cs.push(opt_minimization == 2 ? try_lessthan : 
                                                        min_removed != Int_MAX && min_removed != 0 ? min_removed : 1);
@@ -823,8 +934,16 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         if (opt_minimization == 1) {
             last_unsat_constraint_lit = assump_lit;
             if (constrs.size() > 0 && constrs.last()->lit == assump_lit) {
+                if(use_delay)
+                {
+                    if (constrs.last()->lit != assump_lit) assump_lit = assump_ps.last() = constrs.last()->lit;
+                    delayed_assump_sum += min_removed;
+                    delayed_assump.push(Pair_new(min_removed, assump_lit), constrs.last()->size);
+                    saved_constrs.push(constrs.last()), assump_map.set(toInt(assump_lit),saved_constrs.size() - 1);
+                    saved_constrs_Cs.push(min_removed);
+                }
+                else {
                 Minisat::vec<Lit> new_assump; 
-                if (constrs.size() > 1) constrs[0] = constrs.last(), constrs.shrink(constrs.size() - 1);
                 optimize_last_constraint(constrs, assump_ps, new_assump);
                 if (new_assump.size() > 0) {
                     delayed_assump_sum += Int(new_assump.size()) * assump_Cs.last();
@@ -834,6 +953,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                 if (constrs.last()->lit != assump_lit) assump_lit = assump_ps.last() = constrs.last()->lit;
                 saved_constrs.push(constrs.last()), assump_map.set(toInt(assump_lit),saved_constrs.size() - 1);
                 saved_constrs_Cs.push(assump_Cs.last());
+                }
             } else if (goal_ps.size() > 1) {
                 saved_constrs.push(new (mem.alloc(sizeof(Linear) + goal_ps.size()*(sizeof(Lit) + sizeof(Int))))
                         Linear(goal_ps, goal_Cs, Int_MIN, 1, assump_lit));
@@ -871,7 +991,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
             char *t; reportf("Lower bound  = %s\n", t=toString(LB_goalvalue * goal_gcd)); xfree(t); }
 SwitchSearchMethod:        
         if (opt_minimization == 1 && opt_to_bin_search && LB_goalvalue + 5 < UB_goalvalue &&
-            cpuTime() >= opt_unsat_cpu + start_solving_cpu && sat_solver.conflicts > opt_unsat_conflicts) {
+            (cpuTime() - uwr_begin) >= opt_unsat_cpu + start_solving_cpu && sat_solver.conflicts > opt_unsat_conflicts) {
             int cnt = 0;
             for (int j = 0, i = 0; i < psCs.size(); i++) {
                 const Int &w = soft_cls[psCs[i].snd].fst;
