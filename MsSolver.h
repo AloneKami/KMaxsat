@@ -198,9 +198,15 @@ class MsSolver : public PbSolver {
 
     static int get_score(const int& x, const std::vector<int>& number, const vec<bool>& model) {
         assert(x >= 0);
+        if(model[x]) return number[(x << 1) ^ 1] - number[x << 1];
+        else         return number[x << 1] - number[(x << 1) ^ 1];
+    }
+
+    /*static int get_score(const int& x, const std::vector<int>& number, const vec<bool>& model) {
+        assert(x >= 0);
         if(model[x]) return number[x << 1] - number[(x << 1) ^ 1];
         else         return number[(x << 1) ^ 1] - number[x << 1];
-    }
+    }*/
 
     struct score_cmp {
         const std::vector<int>& number;
@@ -247,7 +253,7 @@ class MsSolver : public PbSolver {
 
     void    local_search(vec<bool>& best_model, Int& goalvalue);
     int     select_by_BMS(int min_size);
-    void    pick_var(std::vector<int>& vars);
+    void    pick_var(std::vector<int>& vars, int& unsat_clause_num);
     void    flip(std::vector<int>& vars, int& unsat_clause_num);
     void    update_weight();
 
