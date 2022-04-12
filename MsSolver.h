@@ -25,6 +25,7 @@
 #include "PbSolver.h"
 #include <vector>
 #include <algorithm>
+#include <string.h>
 
 Int evalGoal(const vec<Pair<weight_t, Minisat::vec<Lit>* > >& soft_cls, vec<bool>& model, Minisat::vec<Lit>& soft_unsat);
 
@@ -32,7 +33,9 @@ static inline int hleft (int i)  { return i * 2; }
 static inline int hright(int i)  { return i * 2 + 1; }
 static inline int hparent(int i) { return i / 2; }
 
+#define __STR_FUNCTION__ _CutParenthesesNTail(std::string(__PRETTY_FUNCTION__))
 
+std::string _CutParenthesesNTail(std::string&& prettyFuncon); 
 
 class IntLitQueue {
   private:
@@ -187,7 +190,7 @@ class MsSolver : public PbSolver {
     int                 top_for_strat, top_for_hard; // Top indices to soft_cls for stratification and hardening operations.
     Map<Lit, Int>       harden_lits;    // The weights of literals included into "At most 1" clauses (MaxSAT preprocessing of soft clauese).
     vec<Pair<Lit,Int> > am1_rels;       // The weights of relaxing vars in "At most 1" clauses
-    
+
     struct num_cmp {
         const std::vector<int>&  number;
         bool operator()(const int x) {
