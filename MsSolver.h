@@ -199,7 +199,7 @@ class MsSolver : public PbSolver {
         num_cmp(const std::vector<int>& num) : number(num) { }
     };
 
-    static int get_score(const int& x, const std::vector<int>& number, const vec<bool>& model) {
+    static int get_score(const int& x, const std::vector<long long>& number, const vec<bool>& model) {
         assert(x >= 0);
         if(model[x]) return number[(x << 1) ^ 1] - number[x << 1];
         else         return number[x << 1] - number[(x << 1) ^ 1];
@@ -212,23 +212,28 @@ class MsSolver : public PbSolver {
     }*/
 
     struct score_cmp {
-        const std::vector<int>& number;
-        const vec<bool>& model;
+        const std::vector<long long>&     number;
+        const vec<bool>&            model;
         bool operator()(const int x) {
             if(get_score(x, number, model) > 0) return true;
             else return false; 
         }
-        score_cmp(const std::vector<int>& num, const vec<bool>& m) : number(num), model(m) { }
+        score_cmp(const std::vector<long long>& num, const vec<bool>& m) : number(num), model(m) { }
     };    
     
     std::vector<std::vector<int>> lit_hard;
     std::vector<std::vector<int>> lit_soft;
-    std::vector<int> score;
+    std::vector<long long> score;
+    std::vector<long long> tmp_score;
     std::vector<int> hard_sat_var;
     std::vector<int> soft_sat_var;
     std::vector<int> hard_truth_num;
     std::vector<int> soft_truth_num;
+    std::vector<int> time_stamp;
+    std::vector<int> selected;
+    std::vector<int> selected_var;
     vec<bool> tmp_model;
+    int ls_step;
 
     Strat_Array<num_cmp> hard_unsat;
     Strat_Array<num_cmp> soft_unsat;
@@ -259,6 +264,7 @@ class MsSolver : public PbSolver {
     void    pick_var(std::vector<int>& vars, int& unsat_clause_num);
     void    flip(std::vector<int>& vars, int& unsat_clause_num);
     void    update_weight();
+    void    check_score();
 
     void    maxsat_solve(solve_Command cmd = sc_Minimize); 
     void    preprocess_soft_cls(Minisat::vec<Lit>& assump_ps, vec<Int>& assump_Cs, const Lit max_assump, const Int& max_assump_Cs, 

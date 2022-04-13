@@ -367,6 +367,11 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         lit_hard.push_back(std::vector<int>());
         lit_soft.push_back(std::vector<int>());
         score.push_back(0);
+        tmp_score.push_back(0);
+    }
+    for(int i = 0; i < pb_n_vars; i++) {
+        time_stamp.push_back(-1);
+        selected.push_back(0);
     }
     bool is_satisfied;
     for(int i = 0; i < pb_n_constrs; i++) {
@@ -479,6 +484,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     top_for_strat = top_for_hard = soft_cls.size();
     Sort::sort(soft_cls);
     soft_cls.copyTo(ls_soft_cls);
+    int total_soft_weight = 0;
     for(int i = 0; i < soft_cls.size(); i++) {
         soft_sat_var.push_back(toInt(lit_Undef));
         soft_truth_num.push_back(0);
@@ -488,7 +494,9 @@ void MsSolver::maxsat_solve(solve_Command cmd)
             Lit& tmp_l = *(soft_cls[i].snd)[j];
             lit_soft[toInt(tmp_l)].push_back(i);
         }
+        total_soft_weight += soft_cls[i].fst;
     }
+    printf("%d\n", total_soft_weight);
     weighted_instance = (soft_cls.size() > 1 && soft_cls[0].fst != soft_cls.last().fst);
     for (int i = 0; i < soft_cls.size(); i++) {
         Lit p = soft_cls[i].snd->last();
