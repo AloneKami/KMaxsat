@@ -9,7 +9,7 @@
 #define __SC_NUM__  10
 #define __SV_NUM__  50
 
-const long min_step = 100000000;
+const long min_step = 1000000;
 const long max_step = 100000000;
 const int MY_RAND_MAX_INT = 10000000;
 const float BASIC_SCALE = 0.0000001;
@@ -73,7 +73,6 @@ void MsSolver::settings() {
 }
 
 void MsSolver::update_weight() {
-    printf("update_weight\n");
     int cls;
     if (((rand() % MY_RAND_MAX_INT) * BASIC_SCALE) < smooth_probability && hard_large_weight_num > 0) {
         assert(soft_unsat.size() == soft_cls.size());
@@ -121,7 +120,11 @@ void MsSolver::update_weight() {
 
 void MsSolver::flip(std::vector<int>& vars, int& unsat_clause_num) {
     for(auto u : vars) {
-        if(u < 0) printf("flips wrong\n"), exit(0);
+        if(u < 0) {
+            printf("flips wrong\n");
+            for(int j = 0; j < vars.size(); j++) printf("%d\n", vars[j]);
+            exit(0);
+        }
         tmp_model[u] = !tmp_model[u];
         Lit tmp_lit = mkLit(u, tmp_model[u]);
         for(auto cls : lit_hard[toInt(tmp_lit)]) {
@@ -288,7 +291,7 @@ void MsSolver::pick_var(std::vector<int>& vars, int& unsat_clause_num) {
             vars.push_back(selected_var[0]);
             return;
         }
-        max_v = selected[0];
+        max_v = selected_var[0];
         score_1 = get_score(max_v, score, tmp_model);
         for(int i = 1; i < selected_var.size(); i++) {
             tmp_score = get_score(selected_var[i], score, tmp_model);
@@ -337,7 +340,7 @@ void MsSolver::pick_var(std::vector<int>& vars, int& unsat_clause_num) {
 }
 
 void MsSolver::local_search(vec<bool>& model, Int& goalvalue) {
-    printf("local_search start %d\n", toint(goalvalue));
+    printf("local_search start %d %g\n", toint(goalvalue), cpuTime());
     Int current_value = goalvalue;
     int unsat_clause_num = 0;
     int no_improve_step = 0;
@@ -392,14 +395,14 @@ void MsSolver::local_search(vec<bool>& model, Int& goalvalue) {
     for(int i = 0; i < pb_n_vars; i++) var_score.insert(i);
     //check_score();
     while(no_improve_step < min_step && ls_step < max_step) {
-        //printf("%d %d %d\n", ls_step, unsat_clause_num, toint(evalGoal(soft_cls, tmp_model, soft_unsat_clause) + fixed_goalval));
+        //printf("%d %d %d %d\n", ls_step, unsat_clause_num, toint(evalGoal(soft_cls, tmp_model, soft_unsat_clause) + fixed_goalval), toint(goalvalue));
         if(unsat_clause_num == 0) {
             Int currentvalue = evalGoal(soft_cls, tmp_model, soft_unsat_clause) + fixed_goalval;
             //printf("currentvalue = %d %d %d\n", toint(currentvalue), toint(goalvalue), ls_step);
             //for(auto u : vars) printf("%d ", u);
             //printf("\n");
             if(currentvalue < goalvalue) {
-                printf("currentvalue = %d %d %d\n", toint(currentvalue), toint(goalvalue), ls_step);
+                printf("currentvalue = %d %d %d %g\n", toint(currentvalue), toint(goalvalue), ls_step, cpuTime());
                 goalvalue = currentvalue;
                 no_improve_step = 0;                   
                 tmp_model.copyTo(model);
@@ -413,6 +416,5 @@ void MsSolver::local_search(vec<bool>& model, Int& goalvalue) {
         ls_step++;
     }
     printf("local_search finish %g\n", cpuTime());
-    exit(0);
     return;        
 }
