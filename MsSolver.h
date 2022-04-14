@@ -239,8 +239,14 @@ class MsSolver : public PbSolver {
     Strat_Array<num_cmp> soft_unsat;
     Strat_Array<score_cmp> var_score;
 
-    int sp;
     int h_inc;
+    float rwprob = 0.01;
+    float rdprob = 0.01;
+    float smooth_probability;
+    long long softclause_weight_threshold;
+    long long total_soft_weight;
+    int hard_large_weight_num;
+
     int max_value;
 
     std::vector<std::vector<int>> lit_in_clause;
@@ -258,9 +264,9 @@ class MsSolver : public PbSolver {
     bool scip_solve(const Minisat::vec<Lit> *assump_ps, const vec<Int> *assump_Cs, const IntLitQueue *delayed_assump,
             bool weighted_instance, int sat_orig_vars, int sat_orig_cls);
 #endif    
-
+    void    settings();
     void    local_search(vec<bool>& best_model, Int& goalvalue);
-    int     select_by_BMS(int min_size);
+    int     select_by_BMS(int min_size, int id);
     void    pick_var(std::vector<int>& vars, int& unsat_clause_num);
     void    flip(std::vector<int>& vars, int& unsat_clause_num);
     void    update_weight();
