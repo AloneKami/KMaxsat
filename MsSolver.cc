@@ -367,6 +367,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         lit_hard.push_back(std::vector<int>());
         lit_soft.push_back(std::vector<int>());
         score.push_back(0);
+        score2.push_back(0);
         tmp_score.push_back(0);
     }
     for(int i = 0; i < pb_n_vars; i++) {
@@ -497,6 +498,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         total_soft_weight += soft_cls[i].fst;
     }
     settings();
+    get_neighbour();
     weighted_instance = (soft_cls.size() > 1 && soft_cls[0].fst != soft_cls.last().fst);
     for (int i = 0; i < soft_cls.size(); i++) {
         Lit p = soft_cls[i].snd->last();

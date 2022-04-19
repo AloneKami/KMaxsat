@@ -178,7 +178,8 @@ class MsSolver : public PbSolver {
         , goal_gcd(1)
         , hard_unsat(num_cmp(hard_truth_num))
         , soft_unsat(num_cmp(soft_truth_num)) 
-        , var_score(score_cmp(score, tmp_model)){}
+        , var_score(score_cmp(score, tmp_model))
+        , var_score2(score_cmp(score2, tmp_model)) {}
 
     Int                 harden_goalval,  //  Harden goalval used in the MaxSAT preprocessing 
                         fixed_goalval;   // The sum of weights of soft clauses that must be false
@@ -224,6 +225,7 @@ class MsSolver : public PbSolver {
     std::vector<std::vector<int>> lit_hard;
     std::vector<std::vector<int>> lit_soft;
     std::vector<long long> score;
+    std::vector<long long> score2;
     std::vector<long long> tmp_score;
     std::vector<int> hard_sat_var;
     std::vector<int> soft_sat_var;
@@ -232,12 +234,14 @@ class MsSolver : public PbSolver {
     std::vector<int> time_stamp;
     std::vector<int> selected;
     std::vector<int> selected_var;
+    std::vector<std::vector<int>> var_neighbour;
     vec<bool> tmp_model;
     int ls_step;
 
     Strat_Array<num_cmp> hard_unsat;
     Strat_Array<num_cmp> soft_unsat;
     Strat_Array<score_cmp> var_score;
+    Strat_Array<score_cmp> var_score2;
 
     int h_inc;
     float rwprob = 0.01;
@@ -265,11 +269,15 @@ class MsSolver : public PbSolver {
             bool weighted_instance, int sat_orig_vars, int sat_orig_cls);
 #endif    
     void    settings();
+    void    get_neighbour();
     void    local_search(vec<bool>& best_model, Int& goalvalue);
     int     select_by_BMS(int min_size, int id);
+    int     select_by_BMS2(int min_size, int id);
     void    pick_var(std::vector<int>& vars, int& unsat_clause_num);
     void    flip(std::vector<int>& vars, int& unsat_clause_num);
+    void    pseudo_flip(int var);
     void    update_weight();
+    void    check_answer();
     void    check_score();
 
     void    maxsat_solve(solve_Command cmd = sc_Minimize); 
