@@ -363,28 +363,6 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     // Convert constraints:
     pb_n_vars = nVars();
     pb_n_constrs = nClauses();
-    for(int i = 0; i < pb_n_vars * 2; i++) {
-        lit_hard.push_back(std::vector<int>());
-        lit_soft.push_back(std::vector<int>());
-        score.push_back(0);
-        score2.push_back(0);
-        tmp_score.push_back(0);
-    }
-    for(int i = 0; i < pb_n_vars; i++) {
-        time_stamp.push_back(-1);
-        selected.push_back(0);
-    }
-    bool is_satisfied;
-    for(int i = 0; i < pb_n_constrs; i++) {
-        hard_truth_num.push_back(0);
-        const Minisat::Clause &ps = sat_solver.GetClause(i, is_satisfied);
-        Minisat::vec<Lit> *ps_copy = new Minisat::vec<Lit>;
-        for(int j = 0; j < ps.size(); j++) {
-            lit_hard[toInt(ps[j])].push_back(i);
-            ps_copy->push(ps[j]);
-        }
-        ls_hard_cls.push(Pair_new(1, ps_copy));
-    }
     if (constrs.size() > 0) {
         if (opt_verbosity >= 1)
             reportf("Converting %d PB-constraints to clauses...\n", constrs.size());
@@ -481,20 +459,56 @@ void MsSolver::maxsat_solve(solve_Command cmd)
             pj = p; j++;
         }
     }
+    for(int i = 0; i < declared_n_vars * 2; i++) {
+        lit_hard.push_back(std::vector<int>());
+        lit_soft.push_back(std::vector<int>());
+        score.push_back(0);
+        score2.push_back(0);
+        tmp_score.push_back(0);
+        var_assump.push_back(0);
+    }
+    for(int i = 0; i < declared_n_vars; i++) {
+        time_stamp.push_back(-1);
+        selected.push_back(0);
+        tmp_model.push(false);
+        var_score.insert(i);
+        var_score2.insert(i);
+    }
+    std::vector<Lit> ps_copy;
+    bool is_satisfied;
+    for(int i = 0; i < pb_n_constrs; i++) {
+        hard_truth_num.push_back(0);
+        hard_sat_var.push_back(0);
+        hard_length.push_back(0);
+        const Minisat::Clause &ps = sat_solver.GetClause(i, is_satisfied);
+        ps_copy.clear();
+        for(int j = 0; j < ps.size(); j++) {
+            lit_hard[toInt(ps[j])].push_back(i);
+            ps_copy.push_back(ps[j]);
+        }
+        ls_hard_cls.push_back(ps_copy);
+        ls_hard_weight.push_back(1);
+    }
+    for(int i = 0; i < nAssigns(); i++) origin_assigns.push_back(Minisat::toInt(sat_solver.getTrail(i))), var_assump[Minisat::toInt(sat_solver.getTrail(i))] = true;
     if (j < soft_cls.size()) soft_cls.shrink(soft_cls.size() - j);
     top_for_strat = top_for_hard = soft_cls.size();
     Sort::sort(soft_cls);
-    soft_cls.copyTo(ls_soft_cls);
     total_soft_weight = 0;
     for(int i = 0; i < soft_cls.size(); i++) {
-        soft_sat_var.push_back(toInt(lit_Undef));
+        soft_sat_var.push_back(0);
         soft_truth_num.push_back(0);
-        Lit& tmp_l = *(soft_cls[i].snd)[0];
+        soft_length.push_back(0);
+        Lit tmp_l = (*soft_cls[i].snd)[0];
         lit_soft[toInt(tmp_l)].push_back(i);
+        ps_copy.clear();
+        ps_copy.push_back(tmp_l);
         for(int j = 1; j < soft_cls[i].snd->size() - 1; j++) {
-            Lit& tmp_l = *(soft_cls[i].snd)[j];
+            Lit tmp_l = (*soft_cls[i].snd)[j];
+            ps_copy.push_back(tmp_l);
             lit_soft[toInt(tmp_l)].push_back(i);
         }
+        ls_soft_cls.push_back(ps_copy);
+        ls_soft_weight.push_back(soft_cls[i].fst);
         total_soft_weight += soft_cls[i].fst;
     }
     settings();
@@ -662,7 +676,8 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                 if (soft_cls[i].snd->size() > 1)
                     model[var(soft_cls[i].snd->last())] = !sign(soft_cls[i].snd->last());
             Int goalvalue = evalGoal(soft_cls, model, soft_unsat) + fixed_goalval;
-            local_search(model, goalvalue);
+            //if((UB_goalvalue - LB_goalvalue) * 10 < UB_goalvalue) 
+            local_search(model, goalvalue, assump_ps);
             extern bool opt_satisfiable_out;
             if (
 #ifdef USE_SCIP
@@ -823,7 +838,6 @@ void MsSolver::maxsat_solve(solve_Command cmd)
             if(opt_verbosity) reportf("bestUnminimizedConflict.size = %d\n", bestConfict.size());
             bestConfict.copyTo(sat_solver.conflict);
         }
-
         Minisat::vec<Lit> core_mus;
         if (opt_core_minimization) {
             if (weighted_instance) {
@@ -1069,7 +1083,6 @@ SwitchSearchMethod:
         }
       }         
     } // END OF LOOP
-
     if (status == l_False && opt_output_top > 0) printf("v\n");
     if (goal_gcd != 1) {
         if (best_goalvalue != Int_MAX) best_goalvalue *= goal_gcd;
@@ -1258,4 +1271,3 @@ void MsSolver::preprocess_soft_cls(Minisat::vec<Lit>& assump_ps, vec<Int>& assum
     if (opt_verbosity >= 2 && am1_cnt > 0) 
         reportf("Found %d AtMostOne cores of avg size: %.2f\n", am1_cnt, (double)am1_len_sum/am1_cnt);
 }
-

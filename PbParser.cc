@@ -338,6 +338,7 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
     Int one(1), weight(0);
     int n_vars = 0, n_constrs = 0;
     bool is_satisfied;
+    std::vector<Lit> ps_copy;
 
 #ifdef MAXPRE
     extern bool opt_use_maxpre;
@@ -389,9 +390,6 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
         if (weight <= 0) { ps.clear(); continue; }
         else if (weight >= hard_bound) {
             if (!solver.addClause(ps)) return false;
-            else {
-                solver.hard_sat_var.push_back(toInt(lit_Undef));
-            }
         } else {
             if (ps.size() == 1) {
                 if (!opt_maxsat_msu) gps.push(~ps.last()), gCs.push(weight);

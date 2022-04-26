@@ -429,21 +429,30 @@ void outputResult(const PbSolver& S, bool optimum)
         printf("\n");
     }
     if (opt_output_top < 0) {
-        if (optimum){
-            if (S.best_goalvalue == Int_MAX) printf("s UNSATISFIABLE\n");
-            else {
-                if (!opt_satisfiable_out) {
-                    char* tmp = toString(S.best_goalvalue);
-                    printf("o %s\n", tmp);
-                    xfree(tmp);
+        FILE* fp;
+        fp = freopen("426-4.txt", "a", stdout);
+        if(fp != NULL) {
+            printf("%s", basename(S.file_name));
+            if (optimum){
+                if (S.best_goalvalue == Int_MAX) printf("s UNSATISFIABLE\n");
+                else {
+                    /*if (!opt_satisfiable_out) {
+                        char* tmp = toString(S.best_goalvalue);
+                        printf("o %s\n", tmp);
+                        xfree(tmp);
+                    }
+                    printf("s OPTIMUM FOUND\n");*/
+                    printf(" 1 %lld", tolong(S.best_goalvalue));
                 }
-                printf("s OPTIMUM FOUND\n");
+            }else{
+                if (S.best_goalvalue == Int_MAX) printf("s UNKNOWN\n");
+                else                             printf("%c SATISFIABLE\n", (opt_satisfiable_out ? 's' : 'c'));
+                printf(" 0 %lld", tolong(S.best_goalvalue));
             }
-        }else{
-            if (S.best_goalvalue == Int_MAX) printf("s UNKNOWN\n");
-            else                             printf("%c SATISFIABLE\n", (opt_satisfiable_out ? 's' : 'c'));
+            printf(" %g %d %lld\n", cpuTime(), S.local_update, S.local_update == 0 ? -1 : tolong(S.ls_best_goalvalue));
+            fp = freopen("/dev/tyy", "w", stdout);
+            resultsPrinted = true;
         }
-        resultsPrinted = true;
     } else if (opt_output_top == 1) resultsPrinted = true;
     fflush(stdout);
 }
@@ -642,6 +651,7 @@ int main(int argc, char** argv)
         opt_maxsat = true; 
         if (opt_minimization < 0) opt_minimization = 1; // alt (unsat based) algorithm
         if (opt_verbosity >= 1) reportf("Parsing MaxSAT file...\n");
+        pb_solver->file_name = opt_input;
         parse_WCNF_file(opt_input, *pb_solver);
         if (opt_convert == ct_Undef) opt_convert = ct_Sorters;
         if (opt_maxsat_msu) {

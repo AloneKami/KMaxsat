@@ -80,6 +80,7 @@ public:
 #endif
 //#if !defined(CADICAL) && !defined(CRYPTOMS)
     const Minisat::Clause& getClause  (int i, bool &is_satisfied) const;
+    Lit getTrail (int i);
 //#endif
     void printVarsCls(bool encoding = true, const vec<Pair<weight_t, Minisat::vec<Lit>* > > *soft_cls = NULL, int soft_cls_sz = 0);
     bool prop_check   (Lit assump, Minisat::vec<Lit>& prop, int psaving = 2); // compute a list of propagated literals given a set of assumptions

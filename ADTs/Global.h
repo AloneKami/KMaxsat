@@ -266,6 +266,7 @@ class vec {
     T*  data;
     int sz;
     int cap;
+    int c_sz;
 
     void     init(int size, const T& pad);
     void     grow(int min_cap);
@@ -276,19 +277,20 @@ public:
     typedef T   Datum;
 
     // Constructors:
-    vec(void)                   : data(NULL) , sz(0)   , cap(0)    { }
-    vec(int size)               : data(NULL) , sz(0)   , cap(0)    { growTo(size); }
-    vec(int size, const T& pad) : data(NULL) , sz(0)   , cap(0)    { growTo(size, pad); }
-    vec(T* array, int size)     : data(array), sz(size), cap(size) { }      // (takes ownership of array -- will be deallocated with 'xfree()')
+    vec(void)                   : data(NULL) , sz(0)   , cap(0)    , c_sz(0)    { }
+    vec(int size)               : data(NULL) , sz(0)   , cap(0)    , c_sz(0)    { growTo(size); }
+    vec(int size, const T& pad) : data(NULL) , sz(0)   , cap(0)    , c_sz(0)    { growTo(size, pad); }
+    vec(T* array, int size)     : data(array), sz(size), cap(size) , c_sz(0)    { }      // (takes ownership of array -- will be deallocated with 'xfree()')
    ~vec(void)                                                      { clear(true); }
 
     // Ownership of underlying array:
-    T*       release  (void)           { T* ret = data; data = NULL; sz = 0; cap = 0; return ret; }
+    T*       release  (void)           { T* ret = data; data = NULL; sz = 0; cap = 0; c_sz = 0; return ret; }
     operator T*       (void)           { return data; }     // (unsafe but convenient)
     operator const T* (void) const     { return data; }
 
     // Size operations:
     int      size   (void) const       { return sz; }
+    int      current_size (void) const { return c_sz; }
     void     shrink (int nelems)       { assert(nelems <= sz); for (int i = 0; i < nelems; i++) sz--, data[sz].~T(); }
     void     shrink_ (int nelems)      { assert(nelems <= sz); sz -= nelems; }
     void     pop    (void)             { sz--, data[sz].~T(); }
@@ -322,6 +324,8 @@ public:
     // Duplicatation (preferred instead):
     void copyTo(vec<T>& copy) const { copy.clear(); copy.growTo(sz); for (int i = 0; i < sz; i++) new (&copy[i]) T(data[i]); }
     void moveTo(vec<T>& dest) { dest.clear(true); dest.data = data; dest.sz = sz; dest.cap = cap; data = NULL; sz = 0; cap = 0; }
+    void swapArray(int& pos_1, int& pos_2) { T tmp_t = data[pos_1]; data[pos_1] = data[pos_2]; data[pos_2] = tmp_t; }
+
 };
 
 template<class T>

@@ -41,6 +41,11 @@ const Minisat::Clause& ExtSimpSolver::getClause  (int i, bool &is_satisfied) con
 }
 #endif
 
+Lit ExtSimpSolver::getTrail (int i) {
+    Lit lit = trail[i];
+    return lit;
+}
+
 void ExtSimpSolver::printVarsCls(bool encoding, const vec<Pair<weight_t, Minisat::vec<Lit>* > > *soft_cls, int soft_cnt)
 {
     Minisat::vec<Var> map; Var max=0;

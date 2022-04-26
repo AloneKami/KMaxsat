@@ -34,6 +34,7 @@ static inline int hright(int i)  { return i * 2 + 1; }
 static inline int hparent(int i) { return i / 2; }
 
 #define __STR_FUNCTION__ _CutParenthesesNTail(std::string(__PRETTY_FUNCTION__))
+#define __Print__ false
 
 std::string _CutParenthesesNTail(std::string&& prettyFuncon); 
 
@@ -116,6 +117,7 @@ class Strat_Array {
 
         void update(int v) {
             assert(v < indices.size());
+            if(indices[v] < 0) exit(0);
             if(lt(v) && indices[v] >= strat_indices) swap_array(array, indices, v, strat_indices++);
             else if(!lt(v) && indices[v] < strat_indices) swap_array(array, indices, v, --strat_indices);
             return;
@@ -123,8 +125,7 @@ class Strat_Array {
 
         void insert(int n) {
             indices.growTo(n + 1, -1);
-            assert(!inArray(n));
-
+            if(indices[n] > 0) exit(0);
             indices[n] = array.size();
             array.push(n);
             update(n); 
@@ -185,8 +186,10 @@ class MsSolver : public PbSolver {
                         fixed_goalval;   // The sum of weights of soft clauses that must be false
     vec<Pair<weight_t, Minisat::vec<Lit>* > > orig_soft_cls; // Soft clauses before preprocessing by MaxPre; empty if MaxPre is not used
     vec<Pair<weight_t, Minisat::vec<Lit>* > > soft_cls; // Relaxed non-unit soft clauses with weights; a relaxing var is the last one in a vector. 
-    vec<Pair<weight_t, Minisat::vec<Lit>* > > ls_hard_cls;
-    vec<Pair<weight_t, Minisat::vec<Lit>* > > ls_soft_cls;
+    std::vector<std::vector<Lit>>    ls_hard_cls;
+    std::vector<std::vector<Lit>>    ls_soft_cls;
+    std::vector<weight_t>    ls_hard_weight;
+    std::vector<weight_t>    ls_soft_weight;
     weight_t            goal_gcd; // gcd of soft_cls weights
     int                 top_for_strat, top_for_hard; // Top indices to soft_cls for stratification and hardening operations.
     Map<Lit, Int>       harden_lits;    // The weights of literals included into "At most 1" clauses (MaxSAT preprocessing of soft clauese).
@@ -235,8 +238,13 @@ class MsSolver : public PbSolver {
     std::vector<int> selected;
     std::vector<int> selected_var;
     std::vector<std::vector<int>> var_neighbour;
+    std::vector<int> hard_length;
+    std::vector<int> soft_length;
+    std::vector<int> var_assump;
+    std::vector<int> origin_assigns;
     vec<bool> tmp_model;
     int ls_step;
+    Int currentvalue;
 
     Strat_Array<num_cmp> hard_unsat;
     Strat_Array<num_cmp> soft_unsat;
@@ -268,9 +276,11 @@ class MsSolver : public PbSolver {
     bool scip_solve(const Minisat::vec<Lit> *assump_ps, const vec<Int> *assump_Cs, const IntLitQueue *delayed_assump,
             bool weighted_instance, int sat_orig_vars, int sat_orig_cls);
 #endif    
+
+    void    Fprint(bool flag, const char* func_name, char* status);
     void    settings();
     void    get_neighbour();
-    void    local_search(vec<bool>& best_model, Int& goalvalue);
+    void    local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps);
     int     select_by_BMS(int min_size, int id);
     int     select_by_BMS2(int min_size, int id);
     void    pick_var(std::vector<int>& vars, int& unsat_clause_num);
