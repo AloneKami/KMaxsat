@@ -34,7 +34,7 @@ static inline int hright(int i)  { return i * 2 + 1; }
 static inline int hparent(int i) { return i / 2; }
 
 #define __STR_FUNCTION__ _CutParenthesesNTail(std::string(__PRETTY_FUNCTION__))
-#define __Print__ false
+#define __Print__ true
 
 std::string _CutParenthesesNTail(std::string&& prettyFuncon); 
 
@@ -277,13 +277,12 @@ class MsSolver : public PbSolver {
             bool weighted_instance, int sat_orig_vars, int sat_orig_cls);
 #endif    
 
-    void    Fprint(bool flag, const char* func_name, char* status);
     void    settings();
     void    get_neighbour();
     void    local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps);
     int     select_by_BMS(int min_size, int id);
     int     select_by_BMS2(int min_size, int id);
-    void    pick_var(std::vector<int>& vars, int& unsat_clause_num);
+    void    pick_var(std::vector<int>& vars);
     void    flip(std::vector<int>& vars, int& unsat_clause_num);
     void    pseudo_flip(int var);
     void    update_weight();

@@ -129,7 +129,6 @@ public:
                 , totalSorters(0), totalSorterInputs(0.0), totalReusedInputs(0.0), totalReusedPercent(0.0)
                 , best_goalvalue(Int_MAX)
                 , ls_best_goalvalue(Int_MAX)
-                , local_update(0)
                 , asynch_interrupt(false)
                 , cpu_interrupt(false)
                 , use_base_assump(false)
@@ -166,7 +165,7 @@ public:
     Int                 best_goalvalue; // Value of goal function for that model (or 'Int_MAX' if no models were found).
     Int                 ls_best_goalvalue;
     bool                asynch_interrupt, cpu_interrupt, use_base_assump;
-    long long           local_update;
+    long long int       local_update;
     char*               file_name;
 
     // Problem specification:

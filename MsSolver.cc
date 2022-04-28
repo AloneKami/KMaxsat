@@ -363,6 +363,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     // Convert constraints:
     pb_n_vars = nVars();
     pb_n_constrs = nClauses();
+    printf("%d %d\n", declared_n_vars, declared_n_constrs);
     if (constrs.size() > 0) {
         if (opt_verbosity >= 1)
             reportf("Converting %d PB-constraints to clauses...\n", constrs.size());
@@ -609,6 +610,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     lbool status;
     int cn = 0;
     auto uwr_begin = cpuTime();
+    local_update = 0;
     while (1) {
       cn++;
       if (use_base_assump) for (int i = 0; i < base_assump.size(); i++) assump_ps.push(base_assump[i]);
@@ -617,11 +619,13 @@ void MsSolver::maxsat_solve(solve_Command cmd)
           sat_solver.setConfBudget(opt_unsat_conflicts - sat_solver.conflicts);
       else sat_solver.budgetOff();
       auto begin = cpuTime();
+      reportf("start %d %g %ld %ld %d %d\n", nClauses(), begin, tolong(UB_goalvalue), tolong(LB_goalvalue), assump_ps.size(), delayed_assump.size());
       status = 
           base_assump.size() == 1 && base_assump[0] == assump_lit ? l_True :
           base_assump.size() == 1 && base_assump[0] == ~assump_lit ? l_False :
           sat_solver.solveLimited(assump_ps);
       auto end = cpuTime();
+      reportf("end %g\n", cpuTime());
       auto _1st_solve_time = end - begin;
       if (use_base_assump) {
           for (int i = 0; i < base_assump.size(); i++) {
@@ -636,7 +640,17 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         cpu_interrupt = false; limitTime(opt_cpu_lim);
         if (status == l_Undef) continue;
       }
+      if(status == l_Undef)     reportf("Undef\n");
+      else if(status == l_True) reportf("SAT\n");
+      else                      reportf("UNSAT\n");
       if (status  == l_Undef) {
+        printf("%d\n", assump_ps.size());
+        int origin_assump_ps_size = assump_ps.size();
+        while(assump_ps.size() < 5 * origin_assump_ps_size) {
+            do_stratification(sat_solver, sorted_assump_Cs, soft_cls, top_for_strat, assump_ps, assump_Cs);
+            preprocess_soft_cls(assump_ps, assump_Cs, max_assump, max_assump_Cs, delayed_assump, delayed_assump_sum);
+        }
+        printf("%d\n", assump_ps.size());
         if (asynch_interrupt) { reportf("*** Interrupted ***\n"); break; }
         if (opt_minimization == 1 && opt_to_bin_search && sat_solver.conflicts >= opt_unsat_conflicts) goto SwitchSearchMethod;
       } else if (status == l_True) { // SAT returned
@@ -676,8 +690,8 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                 if (soft_cls[i].snd->size() > 1)
                     model[var(soft_cls[i].snd->last())] = !sign(soft_cls[i].snd->last());
             Int goalvalue = evalGoal(soft_cls, model, soft_unsat) + fixed_goalval;
-            //if((UB_goalvalue - LB_goalvalue) * 10 < UB_goalvalue) 
-            local_search(model, goalvalue, assump_ps);
+            //reportf("\bGoalvalue: %s\b\n", toString(goalvalue));
+            //if((UB_goalvalue - LB_goalvalue) * 10 < UB_goalvalue) local_search(model, goalvalue, assump_ps);
             extern bool opt_satisfiable_out;
             if (
 #ifdef USE_SCIP
@@ -858,7 +872,6 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         Int min_removed = Int_MAX, min_bound = Int_MAX;
         int removed = 0;
         bool other_conflict = false;
-
         if (opt_minimization == 1) { 
             goal_ps.clear(); goal_Cs.clear();
         }
@@ -958,8 +971,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         if (opt_minimization == 1) {
             last_unsat_constraint_lit = assump_lit;
             if (constrs.size() > 0 && constrs.last()->lit == assump_lit) {
-                if(use_delay)
-                {
+                if(use_delay) {
                     if (constrs.last()->lit != assump_lit) assump_lit = assump_ps.last() = constrs.last()->lit;
                     delayed_assump_sum += min_removed;
                     delayed_assump.push(Pair_new(min_removed, assump_lit), constrs.last()->size);
@@ -969,42 +981,42 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                 else {
                 Minisat::vec<Lit> new_assump; 
                 optimize_last_constraint(constrs, assump_ps, new_assump);
-                if (new_assump.size() > 0) {
-                    delayed_assump_sum += Int(new_assump.size()) * assump_Cs.last();
-                    for (int i=0; i < new_assump.size(); i++) 
-                        delayed_assump.push(Pair_new(assump_Cs.last(), new_assump[i]));
-                }
-                if (constrs.last()->lit != assump_lit) assump_lit = assump_ps.last() = constrs.last()->lit;
-                saved_constrs.push(constrs.last()), assump_map.set(toInt(assump_lit),saved_constrs.size() - 1);
-                saved_constrs_Cs.push(assump_Cs.last());
-                }
-            } else if (goal_ps.size() > 1) {
-                saved_constrs.push(new (mem.alloc(sizeof(Linear) + goal_ps.size()*(sizeof(Lit) + sizeof(Int))))
-                        Linear(goal_ps, goal_Cs, Int_MIN, 1, assump_lit));
-                assump_map.set(toInt(assump_lit),saved_constrs.size() - 1);
-                saved_constrs_Cs.push(assump_Cs.last());
-            }
-            if (!opt_delay_init_constraints) {
-                int j = 0;
-                for (int i = 0; i < saved_constrs.size(); i++)
-                    if (saved_constrs[i] != NULL) {
-                        if (saved_constrs[i]->lo == 1 && saved_constrs[i]->hi == Int_MAX || 
-                                saved_constrs[i]->hi == saved_constrs[i]->size - 1 && saved_constrs[i]->lo == Int_MIN ) {
-                            saved_constrs[i]->~Linear();
-                            saved_constrs[i] = NULL;
-                        } else {
-                            if (j < i) {
-                                saved_constrs[j] = saved_constrs[i],  saved_constrs[i] = NULL, saved_constrs_Cs[j] = saved_constrs_Cs[i];
-                                if (saved_constrs[j]->lit != lit_Undef) assump_map.set(toInt(saved_constrs[j]->lit), j); 
-                            }
-                            j++;
-                        }
+                    if (new_assump.size() > 0) {
+                        delayed_assump_sum += Int(new_assump.size()) * assump_Cs.last();
+                        for (int i=0; i < new_assump.size(); i++) 
+                            delayed_assump.push(Pair_new(assump_Cs.last(), new_assump[i]));
                     }
-                if (j < saved_constrs.size()) 
-                    saved_constrs.shrink(saved_constrs.size() - j), saved_constrs_Cs.shrink(saved_constrs_Cs.size() - j);
-                constrs.clear();
+                    if (constrs.last()->lit != assump_lit) assump_lit = assump_ps.last() = constrs.last()->lit;
+                    saved_constrs.push(constrs.last()), assump_map.set(toInt(assump_lit),saved_constrs.size() - 1);
+                    saved_constrs_Cs.push(assump_Cs.last());
+                    }
+                } else if (goal_ps.size() > 1) {
+                    saved_constrs.push(new (mem.alloc(sizeof(Linear) + goal_ps.size()*(sizeof(Lit) + sizeof(Int))))
+                            Linear(goal_ps, goal_Cs, Int_MIN, 1, assump_lit));
+                    assump_map.set(toInt(assump_lit),saved_constrs.size() - 1);
+                    saved_constrs_Cs.push(assump_Cs.last());
+                }
+                if (!opt_delay_init_constraints) {
+                    int j = 0;
+                    for (int i = 0; i < saved_constrs.size(); i++)
+                        if (saved_constrs[i] != NULL) {
+                            if (saved_constrs[i]->lo == 1 && saved_constrs[i]->hi == Int_MAX || 
+                                    saved_constrs[i]->hi == saved_constrs[i]->size - 1 && saved_constrs[i]->lo == Int_MIN ) {
+                                saved_constrs[i]->~Linear();
+                                saved_constrs[i] = NULL;
+                            } else {
+                                if (j < i) {
+                                    saved_constrs[j] = saved_constrs[i],  saved_constrs[i] = NULL, saved_constrs_Cs[j] = saved_constrs_Cs[i];
+                                    if (saved_constrs[j]->lit != lit_Undef) assump_map.set(toInt(saved_constrs[j]->lit), j); 
+                                }
+                                j++;
+                            }
+                        }
+                    if (j < saved_constrs.size()) 
+                        saved_constrs.shrink(saved_constrs.size() - j), saved_constrs_Cs.shrink(saved_constrs_Cs.size() - j);
+                    constrs.clear();
+                }
             }
-        }
         }
         if (weighted_instance && sat && sat_solver.conflicts > 10000)
             harden_soft_cls(assump_ps, assump_Cs, sorted_assump_Cs, delayed_assump, delayed_assump_sum);

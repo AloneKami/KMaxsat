@@ -337,7 +337,6 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
     int    gvars = 0;
     Int one(1), weight(0);
     int n_vars = 0, n_constrs = 0;
-    bool is_satisfied;
     std::vector<Lit> ps_copy;
 
 #ifdef MAXPRE

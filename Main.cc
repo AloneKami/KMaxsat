@@ -414,7 +414,7 @@ void outputResult(const PbSolver& S, bool optimum)
             }
         } else
 #endif
-        if (optimum || opt_satisfiable_out) {
+        /*if (optimum || opt_satisfiable_out) {
             if (opt_bin_model_out) {
                 printf("v ");
                 for (int i = 0; i < S.declared_n_vars; i++)
@@ -426,15 +426,19 @@ void outputResult(const PbSolver& S, bool optimum)
                         printf(" %s%s", S.best_model[i]?"":"-", S.index2name[i]);
             }
         }
-        printf("\n");
+        printf("\n");*/
+        printf("---\n");
     }
     if (opt_output_top < 0) {
         FILE* fp;
-        fp = freopen("426-4.txt", "a", stdout);
+        fp = freopen("427-4+10.txt", "a", stdout);
         if(fp != NULL) {
             printf("%s", basename(S.file_name));
             if (optimum){
-                if (S.best_goalvalue == Int_MAX) printf("s UNSATISFIABLE\n");
+                if (S.best_goalvalue == Int_MAX) {
+                    //printf("s UNSATISFIABLE\n");
+                    printf(" 0 %s", toString(S.best_goalvalue));
+                }
                 else {
                     /*if (!opt_satisfiable_out) {
                         char* tmp = toString(S.best_goalvalue);
@@ -442,14 +446,14 @@ void outputResult(const PbSolver& S, bool optimum)
                         xfree(tmp);
                     }
                     printf("s OPTIMUM FOUND\n");*/
-                    printf(" 1 %lld", tolong(S.best_goalvalue));
+                    printf(" 1 %s", toString(S.best_goalvalue));
                 }
             }else{
-                if (S.best_goalvalue == Int_MAX) printf("s UNKNOWN\n");
-                else                             printf("%c SATISFIABLE\n", (opt_satisfiable_out ? 's' : 'c'));
-                printf(" 0 %lld", tolong(S.best_goalvalue));
+                //if (S.best_goalvalue == Int_MAX) printf("s UNKNOWN\n");
+                //else                             printf("%c SATISFIABLE\n", (opt_satisfiable_out ? 's' : 'c'));
+                printf(" 0 %s", toString(S.best_goalvalue));
             }
-            printf(" %g %d %lld\n", cpuTime(), S.local_update, S.local_update == 0 ? -1 : tolong(S.ls_best_goalvalue));
+            printf(" %g %lld %s\n", cpuTime(), S.local_update, S.local_update == 0 ? "-1" : toString(S.ls_best_goalvalue));
             fp = freopen("/dev/tyy", "w", stdout);
             resultsPrinted = true;
         }
