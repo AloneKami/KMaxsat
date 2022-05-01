@@ -26,6 +26,7 @@
 #include <vector>
 #include <algorithm>
 #include <string.h>
+#include "Sort.h"
 
 Int evalGoal(const vec<Pair<weight_t, Minisat::vec<Lit>* > >& soft_cls, vec<bool>& model, Minisat::vec<Lit>& soft_unsat);
 
@@ -283,7 +284,7 @@ class MsSolver : public PbSolver {
     int     select_by_BMS(int min_size, int id);
     int     select_by_BMS2(int min_size, int id);
     void    pick_var(std::vector<int>& vars);
-    void    flip(std::vector<int>& vars, int& unsat_clause_num);
+    void    flip(std::vector<int>& vars);
     void    pseudo_flip(int var);
     void    update_weight();
     void    check_answer();

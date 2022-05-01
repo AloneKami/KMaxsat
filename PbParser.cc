@@ -338,6 +338,10 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
     Int one(1), weight(0);
     int n_vars = 0, n_constrs = 0;
     std::vector<Lit> ps_copy;
+    int i, j;
+    Lit p;
+    bool flag;
+    solver.fixed_goalval = 0;
 
 #ifdef MAXPRE
     extern bool opt_use_maxpre;
@@ -390,16 +394,31 @@ static bool parse_wcnfs(B& in, S& solver, bool wcnf_format, Int hard_bound)
         else if (weight >= hard_bound) {
             if (!solver.addClause(ps)) return false;
         } else {
+            Sort::sort(ps);
             if (ps.size() == 1) {
                 if (!opt_maxsat_msu) gps.push(~ps.last()), gCs.push(weight);
             } else {
                 ps.push(lit_Undef);
                 if (!opt_maxsat_msu) gps.push(ps.last()), gCs.push(weight);
             }
+            flag = true;
+            i = j = 0;
+            if(ps.size() > 1) {
+                for (p = lit_Undef; i < ps.size() - 1; i++) {
+                    if (/*solver.value(ps[i]) == l_True ||*/ ps[i] == ~ps[i + 1]) {
+                        flag = false;
+                        break;
+                    }
+                    //else if (solver.value(ps[i]) != l_False && ps[i] != p) ps[j++] = p = ps[i];
+                }
+            }
+            if(flag) {
+                //if(j < i) ps.shrink(i - j);
 #ifdef BIG_WEIGHTS
             solver.storeSoftClause(ps, weight);
 #else
             solver.storeSoftClause(ps, tolong(weight));
+            }
 #endif
         }
         if (solver.declared_n_constrs < 0 && ps.size() > 0) n_constrs++;

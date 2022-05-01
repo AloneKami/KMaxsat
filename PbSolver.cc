@@ -514,7 +514,6 @@ void SIGINT_interrupt(int /*signum*/) { pb_solver->sat_solver.interrupt(); pb_so
 
 Int evalGoal(Linear& goal, vec<bool>& model)
 {
-    printf("evalGoal start\n");
     Int sum = 0;
     for (int i = 0; i < goal.size; i++){
         if (( sign(goal[i]) && model[var(goal[i])] == false)
@@ -522,7 +521,6 @@ Int evalGoal(Linear& goal, vec<bool>& model)
         )
             sum += goal(i);
     }
-    printf("evalGoal finish\n");
     return sum;
 }
 

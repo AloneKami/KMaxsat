@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include "System.h"
-#include "Sort.h"
 #include "Debug.h"
 
 #ifdef USE_SCIP
@@ -363,7 +362,6 @@ void MsSolver::maxsat_solve(solve_Command cmd)
     // Convert constraints:
     pb_n_vars = nVars();
     pb_n_constrs = nClauses();
-    printf("%d %d\n", declared_n_vars, declared_n_constrs);
     if (constrs.size() > 0) {
         if (opt_verbosity >= 1)
             reportf("Converting %d PB-constraints to clauses...\n", constrs.size());
@@ -460,6 +458,9 @@ void MsSolver::maxsat_solve(solve_Command cmd)
             pj = p; j++;
         }
     }
+    if (j < soft_cls.size()) soft_cls.shrink(soft_cls.size() - j);
+    top_for_strat = top_for_hard = soft_cls.size();
+    Sort::sort(soft_cls);
     for(int i = 0; i < declared_n_vars * 2; i++) {
         lit_hard.push_back(std::vector<int>());
         lit_soft.push_back(std::vector<int>());
@@ -491,19 +492,12 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         ls_hard_weight.push_back(1);
     }
     for(int i = 0; i < nAssigns(); i++) origin_assigns.push_back(Minisat::toInt(sat_solver.getTrail(i))), var_assump[Minisat::toInt(sat_solver.getTrail(i))] = true;
-    if (j < soft_cls.size()) soft_cls.shrink(soft_cls.size() - j);
-    top_for_strat = top_for_hard = soft_cls.size();
-    Sort::sort(soft_cls);
     total_soft_weight = 0;
+    int tmp_len;
     for(int i = 0; i < soft_cls.size(); i++) {
-        soft_sat_var.push_back(0);
-        soft_truth_num.push_back(0);
-        soft_length.push_back(0);
-        Lit tmp_l = (*soft_cls[i].snd)[0];
-        lit_soft[toInt(tmp_l)].push_back(i);
         ps_copy.clear();
-        ps_copy.push_back(tmp_l);
-        for(int j = 1; j < soft_cls[i].snd->size() - 1; j++) {
+        tmp_len = soft_cls[i].snd->size() > 1 ? soft_cls[i].snd->size() - 1 : 1;
+        for(j = 1; j < tmp_len; j++) {
             Lit tmp_l = (*soft_cls[i].snd)[j];
             ps_copy.push_back(tmp_l);
             lit_soft[toInt(tmp_l)].push_back(i);
@@ -511,9 +505,12 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         ls_soft_cls.push_back(ps_copy);
         ls_soft_weight.push_back(soft_cls[i].fst);
         total_soft_weight += soft_cls[i].fst;
+        soft_sat_var.push_back(0);
+        soft_truth_num.push_back(0);
+        soft_length.push_back(0);
     }
     settings();
-    get_neighbour();
+    //get_neighbour();
     weighted_instance = (soft_cls.size() > 1 && soft_cls[0].fst != soft_cls.last().fst);
     for (int i = 0; i < soft_cls.size(); i++) {
         Lit p = soft_cls[i].snd->last();
@@ -619,13 +616,13 @@ void MsSolver::maxsat_solve(solve_Command cmd)
           sat_solver.setConfBudget(opt_unsat_conflicts - sat_solver.conflicts);
       else sat_solver.budgetOff();
       auto begin = cpuTime();
-      reportf("start %d %g %ld %ld %d %d\n", nClauses(), begin, tolong(UB_goalvalue), tolong(LB_goalvalue), assump_ps.size(), delayed_assump.size());
+      //reportf("start %d %g %ld %ld %d %d\n", nClauses(), begin, tolong(UB_goalvalue), tolong(LB_goalvalue), assump_ps.size(), delayed_assump.size());
       status = 
           base_assump.size() == 1 && base_assump[0] == assump_lit ? l_True :
           base_assump.size() == 1 && base_assump[0] == ~assump_lit ? l_False :
           sat_solver.solveLimited(assump_ps);
       auto end = cpuTime();
-      reportf("end %g\n", cpuTime());
+      //reportf("end %g\n", cpuTime());
       auto _1st_solve_time = end - begin;
       if (use_base_assump) {
           for (int i = 0; i < base_assump.size(); i++) {
@@ -640,17 +637,17 @@ void MsSolver::maxsat_solve(solve_Command cmd)
         cpu_interrupt = false; limitTime(opt_cpu_lim);
         if (status == l_Undef) continue;
       }
-      if(status == l_Undef)     reportf("Undef\n");
-      else if(status == l_True) reportf("SAT\n");
-      else                      reportf("UNSAT\n");
+      //if(status == l_Undef)     reportf("Undef\n");
+      //else if(status == l_True) reportf("SAT\n");
+      //else                      reportf("UNSAT\n");
       if (status  == l_Undef) {
-        printf("%d\n", assump_ps.size());
+        /*printf("%d\n", assump_ps.size());
         int origin_assump_ps_size = assump_ps.size();
         while(assump_ps.size() < 5 * origin_assump_ps_size) {
             do_stratification(sat_solver, sorted_assump_Cs, soft_cls, top_for_strat, assump_ps, assump_Cs);
             preprocess_soft_cls(assump_ps, assump_Cs, max_assump, max_assump_Cs, delayed_assump, delayed_assump_sum);
         }
-        printf("%d\n", assump_ps.size());
+        printf("%d\n", assump_ps.size());*/
         if (asynch_interrupt) { reportf("*** Interrupted ***\n"); break; }
         if (opt_minimization == 1 && opt_to_bin_search && sat_solver.conflicts >= opt_unsat_conflicts) goto SwitchSearchMethod;
       } else if (status == l_True) { // SAT returned
@@ -691,7 +688,7 @@ void MsSolver::maxsat_solve(solve_Command cmd)
                     model[var(soft_cls[i].snd->last())] = !sign(soft_cls[i].snd->last());
             Int goalvalue = evalGoal(soft_cls, model, soft_unsat) + fixed_goalval;
             //reportf("\bGoalvalue: %s\b\n", toString(goalvalue));
-            //if((UB_goalvalue - LB_goalvalue) * 10 < UB_goalvalue) local_search(model, goalvalue, assump_ps);
+            if((UB_goalvalue - LB_goalvalue) * 10 < UB_goalvalue) local_search(model, goalvalue, assump_ps);
             extern bool opt_satisfiable_out;
             if (
 #ifdef USE_SCIP
