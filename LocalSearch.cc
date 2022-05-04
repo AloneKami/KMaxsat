@@ -9,7 +9,7 @@
 #define __SC_NUM__  10
 #define __SV_NUM__  50
 
-const long min_step = 100000;
+const long min_step = 1000;
 const long max_step = 100000000;
 const int MY_RAND_MAX_INT = 10000000;
 const float BASIC_SCALE = 0.0000001;
@@ -28,13 +28,19 @@ void MsSolver::check_answer() {
         flag = false;
         for(unsigned int j = 0; j < ls_hard_cls[i].size(); j++) {
             Lit& lit = ls_hard_cls[i][j];
-            //printf("%d %d %d\n", Minisat::var(lit), Minisat::sign(lit), tmp_model[Minisat::var(lit)]);
             if((sign(lit) && !tmp_model[Minisat::var(lit)]) || (!sign(lit) && tmp_model[Minisat::var(lit)])) {
                 flag = true;
                 break;
             }
         }
-        if(!flag) printf("check_answer failed\n"), exit(0);
+        if(!flag) {
+            printf("check_answer failed\n"); 
+            for(unsigned j = 0; j < ls_hard_cls[i].size(); j++) {
+                Lit& lit = ls_hard_cls[i][j];
+                printf("%s%d %d\n", sign(lit) ? "-" : "", var(lit), tmp_model[var(lit)]);
+            }
+            exit(0);
+        }
     }
     return;
 }
@@ -84,7 +90,6 @@ void MsSolver::settings() {
         smooth_probability = 0.0000001;
     }
     hard_large_weight_num = 0;
-    //printf("%f %f %f %lld\n", rdprob, rwprob, smooth_probability, softclause_weight_threshold);
     return;
 }
 
@@ -120,9 +125,7 @@ void MsSolver::get_neighbour() {
         nei_flag[i] = false;
         for(auto nei : tmp_nei) nei_flag[nei] = false;
         var_neighbour.push_back(tmp_nei);
-        //printf("%d\n", var_neighbour[i].size());
     }
-    //for(int i = 0; i < pb_n_vars; i++) printf("%d\n", var_neighbour[i].size());
     return;
 }
 
@@ -149,7 +152,6 @@ void MsSolver::update_weight() {
     else {
         for(int i = 0; i < hard_unsat.get_strat(); i++) {
             cls = hard_unsat[i];
-            if(hard_truth_num[cls] != 0) printf("hard_unsat wrong\n"), exit(0);
             if(ls_hard_weight[cls] == 1) hard_large_weight_num++;
             ls_hard_weight[cls] += h_inc;
             for(auto lit : ls_hard_cls[cls]) {
@@ -170,28 +172,21 @@ void MsSolver::update_weight() {
             }
         }
     }
-    //check_score();
-    //printf("update_weight finish\n");
     return;
 }
 
 void MsSolver::flip(std::vector<int>& vars) {
-    //printf("flip start\n");
     for(auto u : vars) {
-        if(u < 0) {
-            printf("%s flips wrong\n", file_name);
-            for(auto j : vars) printf("%d\n", j);
-            exit(0);
-        }
+        printf("%d\n", u);
         tmp_model[u] = !tmp_model[u];
         Lit tmp_lit = mkLit(u, tmp_model[u]);
         for(auto cls : lit_hard[toInt(tmp_lit)]) {
-            if(hard_truth_num[cls] < 0) continue;
+            if(hard_truth_num[cls] == -1 && hard_sat_var[cls] == -1) continue;
             hard_truth_num[cls]--;
             hard_sat_var[cls] -= toInt(tmp_lit);
             if(hard_truth_num[cls] == 0) {
-                for(auto lit : ls_hard_cls[cls]) {
-                    if(var_assump[Minisat::toInt(lit)] || var_assump[Minisat::toInt(~lit)]) continue;
+                for(int i = 0; i < hard_length[cls]; i++) {
+                    Lit lit = ls_hard_cls[cls][i];
                     if(lit == tmp_lit) continue;
                     score[toInt(lit)] += ls_hard_weight[cls];
                     var_score.update(Minisat::var(lit));
@@ -204,13 +199,13 @@ void MsSolver::flip(std::vector<int>& vars) {
             hard_unsat.update(cls);
         }
         for(auto cls : lit_soft[toInt(tmp_lit)]) {
-            if(soft_truth_num[cls] < 0) continue;
+            if(soft_truth_num[cls] == -1 && hard_sat_var[cls] == -1) continue;
             soft_truth_num[cls]--;
             soft_sat_var[cls] -= toInt(tmp_lit);
             if(soft_truth_num[cls] == 0) {
-                for(auto lit : ls_soft_cls[cls]) {
+                for(int i = 0; i < soft_length[cls]; i++) {
+                    Lit lit = ls_soft_cls[cls][i];
                     if(lit == tmp_lit) continue;
-                    if(var_assump[Minisat::toInt(lit)] || var_assump[Minisat::toInt(~lit)]) continue;
                     score[toInt(lit)] += ls_soft_weight[cls];
                     var_score.update(Minisat::var(lit));
                 }
@@ -223,11 +218,11 @@ void MsSolver::flip(std::vector<int>& vars) {
         }
         tmp_lit = mkLit(u, !tmp_model[u]);
         for(auto cls : lit_hard[toInt(tmp_lit)]) {
-            if(hard_truth_num[cls] < 0) continue;
+            if(hard_truth_num[cls] == -1 && hard_sat_var[cls] == -1) continue;
             if(hard_truth_num[cls] == 0) {
-                for(auto lit : ls_hard_cls[cls]) {
+                for(int i = 0; i < hard_length[cls]; i++) {
+                    Lit lit = ls_hard_cls[cls][i];
                     if(lit == tmp_lit) continue;
-                    if(var_assump[Minisat::toInt(lit)] || var_assump[Minisat::toInt(~lit)]) continue;
                     score[Minisat::toInt(lit)] -= ls_hard_weight[cls];
                     var_score.update(Minisat::var(lit));
                 }
@@ -241,11 +236,11 @@ void MsSolver::flip(std::vector<int>& vars) {
             hard_unsat.update(cls);
         }
         for(auto cls : lit_soft[toInt(tmp_lit)]) {
-            if(soft_truth_num[cls] < 0) continue;
+            if(soft_truth_num[cls] == -1 && soft_sat_var[cls] == -1) continue;
             if(soft_truth_num[cls] == 0) {
-                for(auto lit : ls_soft_cls[cls]) {
+                for(int i = 0; i < soft_length[cls]; i++) {
+                    Lit lit = ls_soft_cls[cls][i];
                     if(lit == tmp_lit) continue;
-                    if(var_assump[Minisat::toInt(lit)] || var_assump[Minisat::toInt(~lit)]) continue;
                     score[Minisat::toInt(lit)] -= ls_soft_weight[cls];
                     var_score.update(Minisat::var(lit));
                 }
@@ -260,12 +255,10 @@ void MsSolver::flip(std::vector<int>& vars) {
         }
         var_score.update(u);
     }
-    //check_score();
     return;
 }
 
 void MsSolver::pseudo_flip(int var) {
-    //printf("%s start %d\n", __STR_FUNCTION__.c_str(), var);
     int tt_l;
     if(var < 0) {
         printf("pseudo_flips wrong\n");
@@ -276,9 +269,7 @@ void MsSolver::pseudo_flip(int var) {
         if(var_assump[Minisat::toInt(Minisat::mkLit(u, false))] || var_assump[Minisat::toInt(Minisat::mkLit(u, true))]) continue;
         score2[Minisat::toInt(Minisat::mkLit(u, true))] = score[Minisat::toInt(Minisat::mkLit(u, true))];
         score2[Minisat::toInt(Minisat::mkLit(u, false))] = score[Minisat::toInt(Minisat::mkLit(u, false))];
-        //printf("---\n");
         var_score2.insert(u);
-        //printf("--\n");
     }
     Lit tmp_lit = mkLit(var, !tmp_model[var]);
     Lit lit;
@@ -342,13 +333,10 @@ void MsSolver::pseudo_flip(int var) {
             var_score2.update(Minisat::var(Minisat::toLit(soft_sat_var[cls])));
         }
     }
-    //printf("p finish\n");
-    //printf("%s finish\n", __STR_FUNCTION__.c_str());
     return;
 }
 
 int MsSolver::select_by_BMS(int min_size, int id = -1) {
-    //printf("BMS %d s\n", id);
     long long max_score = 0;
     int v = -1;
     int tmp_v;
@@ -368,12 +356,10 @@ int MsSolver::select_by_BMS(int min_size, int id = -1) {
             if(time_stamp[tmp_v] < time_stamp[v]) v = tmp_v;
         }
     }
-    //printf("BMS f\n");
     return v;
 }
 
 int MsSolver::select_by_BMS2(int min_size, int id) {
-    //printf("BMS2 s\n");
     long long max_score = 0;
     int v = -1;
     int tmp_v;
@@ -393,13 +379,10 @@ int MsSolver::select_by_BMS2(int min_size, int id) {
         }
         var_score2.swap(tmp_v, --tmp_strat);
     }
-    //printf("BMS2 f\n");
     return v;
 }
 
 void MsSolver::pick_var(std::vector<int>& vars) {
-    //printf("%s start\n", __STR_FUNCTION__.c_str());
-    //printf("pick s\n");
     vars.clear();
     selected_var.clear();
     if(var_score.get_strat() > 0) {
@@ -505,13 +488,10 @@ void MsSolver::pick_var(std::vector<int>& vars) {
         if(score_1 > score_2) vars.push_back(max_v);
         else vars.push_back(v1), vars.push_back(v2);
     }
-    //printf("%s start\n", __STR_FUNCTION__.c_str());
     return;
 }
 
 void MsSolver::local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps) {
-    //printf("%s start\n", __STR_FUNCTION__.c_str());
-    int unsat_clause_num;
     int no_improve_step = 0;
     Int ls_weight = 0;
     std::vector<int> vars;
@@ -521,6 +501,7 @@ void MsSolver::local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<
         ls_step = 0;
         memset(time_stamp.data(), -1, time_stamp.size() * sizeof(int));
     }
+    check_answer();
     var_score.clear();
     hard_unsat.clear();
     soft_unsat.clear();
@@ -577,19 +558,12 @@ void MsSolver::local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<
         if(soft_truth_num[i] > -1) soft_unsat.insert(i);
     }
     for(int i = 0; i < declared_n_vars; i++) if(!var_assump[Minisat::toInt(Minisat::mkLit(i, false))] && !var_assump[Minisat::toInt(Minisat::mkLit(i, true))]) var_score.insert(i);
-    unsat_clause_num = hard_unsat.get_strat();
-    //printf("%d %d %s %s\n", soft_unsat.get_strat(), soft_unsat.size(), toString(ls_weight), toString(evalGoal(soft_cls, tmp_model, soft_unsat_clause)));
     while(no_improve_step < min_step && ls_step < max_step && cpuTime() < opt_cpu_lim - 20) {
-        //printf("%d %d %s %s\n", ls_step, unsat_clause_num, toString(evalGoal(soft_cls, tmp_model, soft_unsat_clause) + fixed_goalval), toString(goalvalue));
         if(hard_unsat.get_strat() == 0) {
             currentvalue = fixed_goalval + ls_weight;
             for(int i = 0; i < soft_unsat.get_strat(); i++) currentvalue += soft_cls[soft_unsat[i]].fst;
-            //printf("currentvalue = %s %s %s %d\n", toString(currentvalue), toString(goalvalue), toString(evalGoal(soft_cls, tmp_model, soft_unsat_clause) + fixed_goalval), ls_step);
-            //for(auto u : vars) printf("%d ", u);
-            //printf("\n");
             if(currentvalue < best_goalvalue && currentvalue < goalvalue) {
                 reportf("\b currentvalue = %s %s %d %g\b\n", toString(currentvalue), toString(goalvalue), ls_step, cpuTime());
-                //check_answer();
                 local_update++;
                 goalvalue = currentvalue;
                 no_improve_step = 0;                   
@@ -606,6 +580,5 @@ void MsSolver::local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<
     }
     for(int i = 0; i < assump_ps.size(); i++) if(Minisat::var(assump_ps[i]) < declared_n_vars) var_assump[Minisat::toInt(assump_ps[i])] = 0;
     for(unsigned int i = 0; i < origin_assigns.size(); i++) var_assump[origin_assigns[i]] = 1;
-    //printf("%s finish\n", __STR_FUNCTION__.c_str());
     return;        
 }
