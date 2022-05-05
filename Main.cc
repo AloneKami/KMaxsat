@@ -431,7 +431,7 @@ void outputResult(const PbSolver& S, bool optimum)
     }
     if (opt_output_top < 0) {
         FILE* fp;
-        fp = freopen("origin503v1.txt", "a", stdout);
+        fp = freopen("505-newv3.txt", "a", stdout);
         if(fp != NULL) {
             printf("%s", basename(S.file_name));
             if (optimum){

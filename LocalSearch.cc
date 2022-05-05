@@ -9,7 +9,7 @@
 #define __SC_NUM__  10
 #define __SV_NUM__  50
 
-const long min_step = 1000;
+const long min_step = 1000000;
 const long max_step = 100000000;
 const int MY_RAND_MAX_INT = 10000000;
 const float BASIC_SCALE = 0.0000001;
@@ -177,7 +177,6 @@ void MsSolver::update_weight() {
 
 void MsSolver::flip(std::vector<int>& vars) {
     for(auto u : vars) {
-        printf("%d\n", u);
         tmp_model[u] = !tmp_model[u];
         Lit tmp_lit = mkLit(u, tmp_model[u]);
         for(auto cls : lit_hard[toInt(tmp_lit)]) {
@@ -491,7 +490,8 @@ void MsSolver::pick_var(std::vector<int>& vars) {
     return;
 }
 
-void MsSolver::local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps) {
+void MsSolver::local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps, Int& max_assump_Cs) {
+    //printf("local_search start\n");
     int no_improve_step = 0;
     Int ls_weight = 0;
     std::vector<int> vars;

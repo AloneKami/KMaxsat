@@ -280,7 +280,7 @@ class MsSolver : public PbSolver {
 
     void    settings();
     void    get_neighbour();
-    void    local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps);
+    void    local_search(vec<bool>& best_model, Int& goalvalue, Minisat::vec<Minisat::Lit>& assump_ps, Int& max_assump_Cs);
     int     select_by_BMS(int min_size, int id);
     int     select_by_BMS2(int min_size, int id);
     void    pick_var(std::vector<int>& vars);
